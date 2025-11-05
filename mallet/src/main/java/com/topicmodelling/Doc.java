@@ -1,4 +1,4 @@
-package com.topicmodelling.scraper;
+package com.topicmodelling;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;

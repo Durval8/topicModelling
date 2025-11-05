@@ -1,0 +1,11 @@
+com/topicmodelling/Doc.class
+com/topicmodelling/Topic.class
+com/topicmodelling/MalletApplication.class
+com/topicmodelling/MalletConfig.class
+com/topicmodelling/MalletService.class
+com/topicmodelling/DocumentIterator.class
+com/topicmodelling/MalletController.class
+com/topicmodelling/TopicRepository.class
+com/topicmodelling/DocRepository.class
+com/topicmodelling/ProcessedDocRepository.class
+com/topicmodelling/ProcessedDoc.class

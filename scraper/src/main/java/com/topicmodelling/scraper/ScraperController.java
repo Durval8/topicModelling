@@ -1,6 +1,7 @@
 package com.topicmodelling.scraper;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +17,12 @@ import java.util.List;
 @RequestMapping(value = "/api/scrapper", produces = "application/json")
 public class ScraperController {
 
-    private final String apiURL = "https://content.guardianapis.com/search?q=QUERY&from-date=FROMDATE&to-date=TODATE&page=PAGE&page-size=SIZE&show-fields=bodyText&api-key=" + System.getenv("APIKEY");
+    private final String apiURL = "https://content.guardianapis.com/search?";
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final URI GUARDIAN_BASE = URI.create("https://content.guardianapis.com/search");
+
+
+    // q=QUERY&from-date=FROMDATE&to-date=TODATE&page=PAGE&page-size=SIZE&show-fields=bodyText&api-key=
 
     @Autowired
     private DocService docService;
@@ -30,10 +36,6 @@ public class ScraperController {
 
         // Format search term
         String query = theme.replaceAll(" ", "%20");
-        if (System.getenv("APIKEY") == null) {
-            System.err.println("No API key provided");
-            return -1;
-        }
         List<JSONObject> documents;
         try {
             documents = getRawDocs(nDocs, query, fromDate, toDate);
@@ -50,84 +52,108 @@ public class ScraperController {
             String body = document.getJSONObject("fields").getString("bodyText");
 
             Doc doc = new Doc(id, title, date, body);
-            docService.addDocument(doc);
+
+            if (!docService.containsDocument(doc)) {
+                docService.addDocument(doc);
+            }
         }
 
         return 200;
     }
 
     private List<JSONObject> getRawDocs(int nDocs, String query, String fromDate, String toDate) throws Exception {
+        if (nDocs <= 0) return List.of();
 
-        HttpClient client = HttpClient.newHttpClient();
-        List<String> requests = new ArrayList<>();
-        String requestURL = apiURL.replace("QUERY", query);
-
-        if (fromDate != null) {
-            requestURL = requestURL.replace("FROMDATE", fromDate);
-        } else {
-            requestURL = requestURL.replace("from-date=FROMDATE&", "");
+        final String apiKey = System.getenv("APIKEY");
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("API key not configured");
         }
 
-        if (toDate != null) {
-            requestURL = requestURL.replace("TODATE", toDate);
-        } else {
-            requestURL = requestURL.replace("to-date=TODATE&", "");
+        final HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(10))
+                .build();
+
+        // Always start with page 1 to learn how many pages exist.
+        int pageSize = Math.min(MAX_PAGE_SIZE, nDocs);
+        URI firstPageUri = buildGuardianUri(query, fromDate, toDate, /*page=*/1, pageSize, apiKey);
+
+        HttpResponse<String> firstResp = send(client, firstPageUri);
+        JSONObject firstJson = new JSONObject(firstResp.body());
+
+        JSONObject resp = firstJson.getJSONObject("response");
+
+        int availablePages = resp.optInt("pages", 1);
+        int requiredPages = (int) Math.ceil(nDocs / (double) MAX_PAGE_SIZE);
+        int pagesToFetch = Math.min(availablePages, requiredPages);
+
+        if (pagesToFetch == 0) {
+            throw new Exception("Not enough articles to fulfill the request");
         }
 
+        List<JSONObject> documents = new ArrayList<>(nDocs);
+        // Collect from first page
+        appendResults(resp, documents);
 
-        if (nDocs >= 50) {  // Maximum amount of docs per page for the api
-            int iterations = nDocs / 50;
-            String iURL;
-            for (int page = 1; page < iterations + 2; page++) { // Page numbering starts at 1 and cant forget about remainder
-                if (nDocs - 50 >= 0) {
-                    iURL = requestURL.replace("PAGE", Integer.toString(page)).replace("SIZE", Integer.toString(50));
-                } else {
-                    iURL = requestURL.replace("PAGE", Integer.toString(page)).replace("SIZE", Integer.toString(nDocs));
-                }
-                nDocs -= 50;
-                requests.add(iURL);
-            }
-        } else {
-            requestURL = requestURL.replace("SIZE", Integer.toString(nDocs));
-            requests.add(requestURL);
+        // Fetch remaining pages until we have nDocs (respect remainder on last page)
+        int collected = documents.size();
+        for (int page = 2; page <= pagesToFetch && collected < nDocs; page++) {
+            int remaining = nDocs - collected;
+            int thisPageSize = Math.min(MAX_PAGE_SIZE, remaining);
+            URI pageUri = buildGuardianUri(query, fromDate, toDate, page, thisPageSize, apiKey);
+
+            HttpResponse<String> r = send(client, pageUri);
+            JSONObject j = new JSONObject(r.body()).getJSONObject("response");
+            appendResults(j, documents);
+            collected = documents.size();
         }
 
-        var req = HttpRequest.newBuilder(URI.create(requests.removeFirst()))
+        // Trim in case the API returned more than requested
+        if (documents.size() > nDocs) {
+            return documents.subList(0, nDocs);
+        }
+        return documents;
+    }
+
+    private static URI buildGuardianUri(String query, String fromDate, String toDate,
+                                        int page, int pageSize, String apiKey) {
+        StringBuilder sb = new StringBuilder(GUARDIAN_BASE.toString()).append('?');
+        sb.append("q=").append(encode(query));
+        if (fromDate != null && !fromDate.isBlank()) {
+            sb.append("&from-date=").append(encode(fromDate));
+        }
+        if (toDate != null && !toDate.isBlank()) {
+            sb.append("&to-date=").append(encode(toDate));
+        }
+        sb.append("&page=").append(page);
+        sb.append("&page-size=").append(pageSize);
+        sb.append("&show-fields=bodyText");
+        sb.append("&api-key=").append(encode(apiKey));
+        return URI.create(sb.toString());
+    }
+
+    private static String encode(String s) {
+        return java.net.URLEncoder.encode(s == null ? "" : s, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static HttpResponse<String> send(HttpClient client, URI uri) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(uri)
+                .timeout(java.time.Duration.ofSeconds(20))
                 .header("Accept", "application/json")
                 .build();
 
-        HttpResponse<String> response = client.send(req, HttpResponse.BodyHandlers.ofString());
-        JSONObject payload = new JSONObject(response.body());
-
-        // Check if we have enough pages in the query
-        int pages = Integer.parseInt(payload.getJSONObject("response").get("pages").toString());
-        if (pages < requests.size() + 1) {
-            throw new Exception("Not enough articles to fulfill the request");
+        HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+        int status = resp.statusCode();
+        if (status < 200 || status >= 300) {
+            throw new RuntimeException("HTTP " + status + " for " + uri + " body=" + resp.body());
         }
-        // Get data for each document
-        JSONArray page = new JSONArray(payload.getJSONObject("response").getJSONArray("results"));
-        List<JSONObject> documents = new ArrayList<>();
+        return resp;
+    }
 
-        for (int i = 0; i < page.length(); i++) {
-            JSONObject document = page.getJSONObject(i);
-            documents.add(document);
+    private static void appendResults(JSONObject responseObj, List<JSONObject> out) {
+        var results = responseObj.optJSONArray("results");
+        if (results == null) return;
+        for (int i = 0; i < results.length(); i++) {
+            out.add(results.getJSONObject(i));
         }
-
-        for (String request : requests) {
-            req = HttpRequest.newBuilder(URI.create(request))
-                    .header("Accept", "application/json")
-                    .build();
-
-            response = client.send(req, HttpResponse.BodyHandlers.ofString());
-            payload = new JSONObject(response.body());
-            page = new JSONArray(payload.getJSONObject("response").getJSONArray("results"));
-
-            for (int i = 0; i < page.length(); i++) {
-                JSONObject document = page.getJSONObject(i);
-                documents.add(document);
-            }
-        }
-
-        return documents;
     }
 }

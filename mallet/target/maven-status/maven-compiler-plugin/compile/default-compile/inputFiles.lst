@@ -1,0 +1,11 @@
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/Doc.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/DocRepository.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/DocumentIterator.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/MalletApplication.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/MalletConfig.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/MalletController.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/MalletService.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/ProcessedDoc.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/ProcessedDocRepository.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/Topic.java
+/home/pedro/topicModelling/mallet/src/main/java/com/topicmodelling/TopicRepository.java
