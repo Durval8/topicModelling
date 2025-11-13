@@ -1,5 +1,6 @@
 package com.topicmodelling.scraper;
 
+import com.amazonaws.services.s3.AmazonS3;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -17,15 +18,15 @@ import java.util.List;
 @RequestMapping(value = "/api/scrapper", produces = "application/json")
 public class ScraperController {
 
-    private final String apiURL = "https://content.guardianapis.com/search?";
     private static final int MAX_PAGE_SIZE = 50;
     private static final URI GUARDIAN_BASE = URI.create("https://content.guardianapis.com/search");
 
-
-    // q=QUERY&from-date=FROMDATE&to-date=TODATE&page=PAGE&page-size=SIZE&show-fields=bodyText&api-key=
+    //@Autowired
+    //private DocService docService;
 
     @Autowired
-    private DocService docService;
+    private S3Service s3Service;
+
 
     @GetMapping("/scrape")
     public int scrapeDocs(
@@ -33,6 +34,8 @@ public class ScraperController {
             @RequestParam String theme,
             @RequestParam(required = false) String fromDate,
             @RequestParam(required = false) String toDate) {
+
+        //s3Service = new S3Service(s3Config.amazonS3());
 
         // Format search term
         String query = theme.replaceAll(" ", "%20");
@@ -53,9 +56,11 @@ public class ScraperController {
 
             Doc doc = new Doc(id, title, date, body);
 
-            if (!docService.containsDocument(doc)) {
-                docService.addDocument(doc);
-            }
+            s3Service.uploadFile(doc);
+
+   //         if (!docService.containsDocument(doc)) {
+     //           docService.addDocument(doc);
+       //     }
         }
 
         return 200;
