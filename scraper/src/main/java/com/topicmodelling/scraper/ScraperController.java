@@ -1,8 +1,6 @@
 package com.topicmodelling.scraper;
 
-import com.amazonaws.services.s3.AmazonS3;
-import org.json.JSONArray;
-import org.json.JSONException;
+
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -21,11 +19,11 @@ public class ScraperController {
     private static final int MAX_PAGE_SIZE = 50;
     private static final URI GUARDIAN_BASE = URI.create("https://content.guardianapis.com/search");
 
-    //@Autowired
-    //private DocService docService;
-
     @Autowired
-    private S3Service s3Service;
+    private DocService docService;
+
+//    @Autowired
+//    private S3Service s3Service;
 
 
     @GetMapping("/scrape")
@@ -55,12 +53,13 @@ public class ScraperController {
             String body = document.getJSONObject("fields").getString("bodyText");
 
             Doc doc = new Doc(id, title, date, body);
-
-            s3Service.uploadFile(doc);
-
-   //         if (!docService.containsDocument(doc)) {
-     //           docService.addDocument(doc);
-       //     }
+//
+//            s3Service.uploadFile(doc);
+//
+            System.out.println(doc.articleId);
+            if (!docService.containsDoc(doc)) {
+                docService.addDoc(doc);
+            }
         }
 
         return 200;
