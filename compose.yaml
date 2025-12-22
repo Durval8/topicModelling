@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  scraper:
+    build: scraper
+    container_name: scraper
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mongo
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/app
+
+  mallet:
+    build: mallet
+    container_name: mallet
+    ports:
+      - "8081:8080"
+    depends_on:
+      - mongo
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/app
+    volumes:
+      - model-store:/mallet/models
+      - pipe-store:/mallet/pipes
+
+volumes:
+  mongo-data:
+  model-store:
+  pipe-store:

@@ -4,10 +4,8 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.util.Map;
-
 @Data
-@Document(collection = "processed_documents")
+@Document(collection = "processedDoc")
 public class ProcessedDoc {
 
     @Id
@@ -16,13 +14,15 @@ public class ProcessedDoc {
     private String date;
     private String body;
     private double[] topics;
+    private String theme;
 
-    public ProcessedDoc(String articleId, String title, String date, String body, double[] topics) {
+    public ProcessedDoc(String articleId, String title, String date, String body, double[] topics, String theme) {
         this.articleId = articleId;
         this.title = title;
         this.date = date;
         this.body = body;
         this.topics = topics;
+        this.theme = theme;
     }
 
 }

@@ -8,9 +8,11 @@ import cc.mallet.types.InstanceList;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,23 +27,27 @@ public class MalletController {
     private MalletService malletService;
 
     @GetMapping("/train")
-    public void trainTopicModels() throws IOException {
-        processDocuments();
+    public void trainTopicModels(
+            @RequestParam String theme,
+            @RequestParam(required = false, defaultValue = "500") int size
+    ) throws IOException {
+        String corpus = processDocuments(theme, size);
 
-        InputStream dataInputStream = new FileInputStream(malletService.getTrainDataPath().toString());
+//        InputStream dataInputStream = new FileInputStream(malletService.getTrainDataPath(theme).toString());
+        InputStream dataInputStream = new ByteArrayInputStream(corpus.getBytes(StandardCharsets.UTF_8));
         InputStream stoplistInputStream = MalletController.class.getResourceAsStream("/stoplist_en.txt");
-        SerialPipes pipeList = createPipes(stoplistInputStream);
+//        SerialPipes pipeList = createPipes(stoplistInputStream);
 
-        malletService.savePipes(pipeList);
+//        malletService.savePipes(pipeList, theme);
 
-        InstanceList instances = createInstanceList(dataInputStream, pipeList);
+        InstanceList instances = createInstanceList(dataInputStream, malletService.loadPipes());
 
-        int numTopics = 40;
+        int numTopics = 10;
         int numIterations = 300;
-        int numTopWords = 25;
+        int numTopWords = 5;
 
         ParallelTopicModel topicModel = trainTopicModel(instances, numTopics, numIterations, numTopWords);
-        malletService.saveModel(topicModel);
+        malletService.saveModel(topicModel, theme);
 
         for (int t = 0; t < numTopics; t++) {
             List<String> topWords = new ArrayList<>();
@@ -54,10 +60,10 @@ public class MalletController {
     }
 
     @GetMapping("/topics")
-    public void getTopics() throws Exception {
+    public void getTopics(String theme) throws Exception {
         List<Doc> docs = malletService.getAllRawDocs();
         if (docs.isEmpty()) { return; }
-        ParallelTopicModel topicModel = malletService.loadModel();
+        ParallelTopicModel topicModel = malletService.loadModel(theme);
         SerialPipes pipes = malletService.loadPipes();
         InstanceList instances = new InstanceList(pipes);
 
@@ -72,22 +78,22 @@ public class MalletController {
             Doc doc = docs.get(i);
             double[] topics = topicInferencer.getSampledDistribution(instance, 300, 1, 5);
 
-            malletService.saveProcessedDoc(new ProcessedDoc(doc.getArticleId(), doc.getTitle(), doc.getDate(), doc.getRawContent(), topics));
+            malletService.saveProcessedDoc(new ProcessedDoc(doc.getArticleId(), doc.getTitle(), doc.getDate(), doc.getRawContent(), topics, theme));
         }
     }
 
-    private static SerialPipes createPipes(InputStream stoplistInputStream) throws IOException {
-        // Begin by importing documents from text to feature sequences
-        ArrayList<Pipe> pipeList = new ArrayList<>();
-
-        // Pipes: lowercase, tokenize, remove stopwords, map to features
-        pipeList.add(new CharSequenceLowercase());
-        pipeList.add(new CharSequence2TokenSequence(Pattern.compile("\\p{L}[\\p{L}\\p{P}]+\\p{L}")));
-        pipeList.add(new TokenSequenceRemoveStopwords(stoplistInputStream, "UTF-8", false, false, false));
-        pipeList.add(new TokenSequence2FeatureSequence());
-
-        return new SerialPipes(pipeList);
-    }
+//    private static SerialPipes createPipes(InputStream stoplistInputStream) throws IOException {
+//        // Begin by importing documents from text to feature sequences
+//        ArrayList<Pipe> pipeList = new ArrayList<>();
+//
+//        // Pipes: lowercase, tokenize, remove stopwords, map to features
+//        pipeList.add(new CharSequenceLowercase());
+//        pipeList.add(new CharSequence2TokenSequence(Pattern.compile("\\p{L}[\\p{L}\\p{P}]+\\p{L}")));
+//        pipeList.add(new TokenSequenceRemoveStopwords(stoplistInputStream, "UTF-8", false, false, false));
+//        pipeList.add(new TokenSequence2FeatureSequence());
+//
+//        return new SerialPipes(pipeList);
+//    }
 
     private static InstanceList createInstanceList(InputStream dataInputStream, SerialPipes pipeList) throws IOException {
 
@@ -119,28 +125,40 @@ public class MalletController {
     }
 
 
-    private void processDocuments() {
-        List<Doc> documents = malletService.getAllRawDocs();
-        int trainingSetSize = Math.min(documents.size(), 500);
-        List<Doc> trainingSet = new ArrayList<>(trainingSetSize);
-
-        Collections.shuffle(documents); // shuffle in-place
-        trainingSet.addAll(documents.subList(0, trainingSetSize));
-
-        try (BufferedWriter writer = Files.newBufferedWriter(malletService.getTrainDataPath())) {
-            for (Doc doc : trainingSet) {
-                // MALLET format: "docId date text"
-                String line = String.join("\t",
-                        doc.getArticleId(),
-                        doc.getDate(),
-                        doc.getTitle(),
-                        doc.getRawContent().replaceAll("\\s+", " ")
-                );
-                writer.write(line);
-                writer.newLine();
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to write MALLET input file", e);
+    private String processDocuments(String theme, int size) {
+//        List<Doc> documents = malletService.getAllRawDocs();
+        List<Doc> documents = malletService.getRandomRawDocs(size, theme);
+        if (documents.isEmpty()) {
+            throw new IllegalStateException(
+                    "No documents found for theme '" + theme + "'. Training aborted."
+            );
         }
+//        int trainingSetSize = Math.min(documents.size(), 500);
+//        List<Doc> trainingSet = new ArrayList<>(documents.size());
+
+//        Collections.shuffle(documents); // shuffle in-place
+//        trainingSet.addAll(documents.subList(0, documents.size()));
+        StringBuilder sb = new StringBuilder();
+
+//        try (BufferedWriter writer = Files.newBufferedWriter(malletService.getTrainDataPath(theme))) {
+        for (Doc doc : documents) {
+            System.out.println(doc.getTheme());
+            // MALLET format: "docId date title text"
+            String line = String.join("\t",
+                    doc.getArticleId(),
+                    doc.getDate(),
+                    doc.getTitle(),
+                    doc.getRawContent().replaceAll("\\s+", " "),
+                    "\n"
+            );
+            sb.append(line);
+//            writer.write(line);
+//            writer.newLine();
+        }
+//        } catch (IOException e) {
+//            throw new RuntimeException("Failed to write MALLET input file", e);
+//        }
+
+        return sb.toString();
     }
 }

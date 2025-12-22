@@ -13,7 +13,7 @@ public class DocService {
         docRepository.save(doc);
     }
 
-    public  boolean containsDoc(Doc doc) {
+    public boolean containsDoc(Doc doc) {
         return docRepository.findById(doc.getArticleId()).isPresent();
     }
 }

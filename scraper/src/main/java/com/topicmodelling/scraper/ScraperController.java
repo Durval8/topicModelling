@@ -22,10 +22,6 @@ public class ScraperController {
     @Autowired
     private DocService docService;
 
-//    @Autowired
-//    private S3Service s3Service;
-
-
     @GetMapping("/scrape")
     public int scrapeDocs(
             @RequestParam int nDocs,
@@ -33,10 +29,8 @@ public class ScraperController {
             @RequestParam(required = false) String fromDate,
             @RequestParam(required = false) String toDate) {
 
-        //s3Service = new S3Service(s3Config.amazonS3());
-
         // Format search term
-        String query = theme.replaceAll(" ", "%20");
+        String query = theme.replaceAll("\\s+", "%20");
         List<JSONObject> documents;
         try {
             documents = getRawDocs(nDocs, query, fromDate, toDate);
@@ -52,11 +46,8 @@ public class ScraperController {
             String date = rawDate.substring(0, rawDate.indexOf("T"));
             String body = document.getJSONObject("fields").getString("bodyText");
 
-            Doc doc = new Doc(id, title, date, body);
-//
-//            s3Service.uploadFile(doc);
-//
-            System.out.println(doc.articleId);
+            Doc doc = new Doc(id, title, date, body, theme);
+
             if (!docService.containsDoc(doc)) {
                 docService.addDoc(doc);
             }

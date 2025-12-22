@@ -1,0 +1,46 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: durval
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: scraper
+service: scraper-sls
+provider:
+  name: aws
+  runtime: java21
+  timeout: 30
+  stage: dev
+  region: eu-north-1
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:ListBucket
+          Resource:
+            - arn:aws:s3:::${self:custom.bucketName}
+            - arn:aws:s3:::${self:custom.bucketName}/*
+custom:
+  bucketName: document-576767200101
+package:
+  artifact: target/scraper-lambda-1.0-SNAPSHOT-lambda-package.zip
+functions:
+  scraper:
+    handler: com.topicmodelling.StreamLambdaHandler::handleRequest
+    environment:
+      FUNCTION_NAME: scraper
+      APIKEY: 2ae016b9-89ac-4e8d-93d2-d6643fe02627
+      BUCKET_NAME: ${self:custom.bucketName}
+    events:
+      - http:
+          method: GET
+          path: /api/scrapper/scrape
+resources:
+  Resources:
+    RawDocsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.bucketName}
+        VersioningConfiguration:
+          Status: Enabled
+

@@ -39,8 +39,10 @@ public class DocumentIterator implements Iterator<Instance> {
         // 14	2017-02	Homeland Security Secretary...
         String docId = lineEntries[0];  // identifier of the document
         String label = lineEntries[1];  // label of the document (in this case a date)
-        String text = lineEntries[2];   // content (text) of the document
-        return new Instance(text, label, docId, "");
+        String title = lineEntries[2];   // content (text) of the document
+        String text = lineEntries[3];
+
+        return new Instance(text, label, title, docId);
     }
 
     public boolean hasNext() {

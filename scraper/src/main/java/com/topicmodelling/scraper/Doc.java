@@ -13,11 +13,13 @@ public class Doc {
     String title;
     String date;        // ISO-8601 yyyy-MM-dd
     String rawContent;
+    String theme;
 
-    public Doc(String articleId, String title, String date, String rawContent) {
+    public Doc(String articleId, String title, String date, String rawContent, String theme) {
         this.articleId = articleId;
         this.title = title;
         this.rawContent = rawContent;
         this.date = date;
+        this.theme = theme;
     }
 }

@@ -1,5 +1,8 @@
 package com.topicmodelling;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +23,7 @@ public class ScraperController {
 
     private static final int MAX_PAGE_SIZE = 50;
     private static final URI GUARDIAN_BASE = URI.create("https://content.guardianapis.com/search");
+    private static final Logger log = LogManager.getLogger(ScraperController.class);
 
     //@Autowired
     //private DocService docService;
@@ -43,7 +47,7 @@ public class ScraperController {
         try {
             documents = getRawDocs(nDocs, query, fromDate, toDate);
         } catch (Exception e) {
-            System.err.println(e);
+            log.log(Level.WARN, e.getMessage());
             return -1;
         }
 
@@ -56,7 +60,12 @@ public class ScraperController {
 
             Doc doc = new Doc(id, title, date, body);
 
-            s3Service.uploadFile(doc);
+            try {
+                s3Service.uploadFile(doc);
+            } catch (Error e) {
+                log.log(Level.ERROR, e.getMessage());
+                return -1;
+            }
 
    //         if (!docService.containsDocument(doc)) {
      //           docService.addDocument(doc);
@@ -82,7 +91,13 @@ public class ScraperController {
         int pageSize = Math.min(MAX_PAGE_SIZE, nDocs);
         URI firstPageUri = buildGuardianUri(query, fromDate, toDate, /*page=*/1, pageSize, apiKey);
 
-        HttpResponse<String> firstResp = send(client, firstPageUri);
+        HttpResponse<String> firstResp;
+
+        try {
+            firstResp = send(client, firstPageUri);
+        } catch (Exception e) {
+            throw new Exception(e);
+        }
         JSONObject firstJson = new JSONObject(firstResp.body());
 
         JSONObject resp = firstJson.getJSONObject("response");
@@ -116,6 +131,7 @@ public class ScraperController {
         if (documents.size() > nDocs) {
             return documents.subList(0, nDocs);
         }
+        log.log(Level.INFO, "Scraped {0} documents", documents.size());
         return documents;
     }
 
@@ -133,6 +149,7 @@ public class ScraperController {
         sb.append("&page-size=").append(pageSize);
         sb.append("&show-fields=bodyText");
         sb.append("&api-key=").append(encode(apiKey));
+        log.log(Level.INFO, "Built URI {0}", sb.toString());
         return URI.create(sb.toString());
     }
 

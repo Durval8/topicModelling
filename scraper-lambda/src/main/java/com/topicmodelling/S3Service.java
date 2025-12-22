@@ -22,7 +22,7 @@ public class S3Service {
     }
 
     // Upload file to S3 bucket
-    public String uploadFile(Doc doc) {
+    public void uploadFile(Doc doc) {
         try {
             byte[] json = om.writeValueAsBytes(doc); // JSON, not Java serialization
             var meta = new ObjectMetadata();
@@ -33,9 +33,10 @@ public class S3Service {
             amazonS3.putObject(req);
         } catch (Exception e) {
             e.printStackTrace();
-            return "Error uploading file";
+            throw new Error("Error uploading file");
+            // return "Error uploading file";
         }
-        return "200";
+        //return "200";
     }
 
     // Download file from S3 bucket
