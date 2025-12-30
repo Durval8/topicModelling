@@ -13,11 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping(value = "/api/mallet", produces = "application/json")
@@ -31,6 +28,7 @@ public class MalletController {
             @RequestParam String theme,
             @RequestParam(required = false, defaultValue = "500") int size
     ) throws IOException {
+
         String corpus = processDocuments(theme, size);
 
 //        InputStream dataInputStream = new FileInputStream(malletService.getTrainDataPath(theme).toString());
@@ -45,6 +43,7 @@ public class MalletController {
         int numTopics = 10;
         int numIterations = 300;
         int numTopWords = 5;
+
 
         ParallelTopicModel topicModel = trainTopicModel(instances, numTopics, numIterations, numTopWords);
         malletService.saveModel(topicModel, theme);
@@ -95,7 +94,7 @@ public class MalletController {
 //        return new SerialPipes(pipeList);
 //    }
 
-    private static InstanceList createInstanceList(InputStream dataInputStream, SerialPipes pipeList) throws IOException {
+    private static InstanceList createInstanceList(InputStream dataInputStream, SerialPipes pipeList) {
 
         InstanceList instances = new InstanceList(pipeList);
 
@@ -121,7 +120,6 @@ public class MalletController {
         topicModel.estimate();
 
         return topicModel;
-
     }
 
 

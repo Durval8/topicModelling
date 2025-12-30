@@ -75,10 +75,8 @@ public class MalletService  {
             ObjectOutputStream oos = new ObjectOutputStream(outFile);
             oos.writeObject(pipes);
             oos.close();
-        } catch (FileNotFoundException ex) {
-            // handle error
         } catch (IOException ex) {
-            // handle error
+            throw new FileNotFoundException("Pipes file could not be resolved");
         }
     }
 //

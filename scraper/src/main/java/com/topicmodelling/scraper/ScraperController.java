@@ -21,6 +21,9 @@ public class ScraperController {
 
     @Autowired
     private DocService docService;
+    @Autowired
+    private KafkaService kafkaService;
+
 
     @GetMapping("/scrape")
     public int scrapeDocs(
@@ -48,9 +51,11 @@ public class ScraperController {
 
             Doc doc = new Doc(id, title, date, body, theme);
 
-            if (!docService.containsDoc(doc)) {
-                docService.addDoc(doc);
-            }
+            kafkaService.sendEvent(doc);
+//
+//            if (!docService.containsDoc(doc)) {
+//                docService.addDoc(doc);
+//            }
         }
 
         return 200;
