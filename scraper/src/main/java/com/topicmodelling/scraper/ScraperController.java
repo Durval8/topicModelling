@@ -11,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping(value = "/api/scrapper", produces = "application/json")
@@ -42,16 +43,12 @@ public class ScraperController {
             return -1;
         }
 
+
+
         for (JSONObject document: documents) {
-            String id = document.getString("id");
-            String title = document.getString("webTitle");
-            String rawDate = document.getString("webPublicationDate");
-            String date = rawDate.substring(0, rawDate.indexOf("T"));
-            String body = document.getJSONObject("fields").getString("bodyText");
+            Doc doc = buildDoc(theme, document);
 
-            Doc doc = new Doc(id, title, date, body, theme);
-
-            kafkaService.sendEvent(doc);
+            kafkaService.process(doc);
 //
 //            if (!docService.containsDoc(doc)) {
 //                docService.addDoc(doc);
@@ -59,6 +56,44 @@ public class ScraperController {
         }
 
         return 200;
+    }
+
+    @GetMapping(value = "/newTheme")
+    public int buildTheme(
+            @RequestParam int nDocs,
+            @RequestParam String theme,
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate
+    ) {
+        String query = theme.replaceAll("\\s+", "%20");
+        List<JSONObject> documents;
+        try {
+            documents = getRawDocs(nDocs, query, fromDate, toDate);
+        } catch (Exception e) {
+            System.err.println(e);
+            return -1;
+        }
+
+        String batchID =  theme;
+        for (JSONObject document : documents) {
+            Doc doc = buildDoc(batchID, document);
+            System.out.println("SENT DOC: " + doc.getTitle());
+            kafkaService.batch(doc, batchID, false);
+        }
+
+        kafkaService.batch(null, batchID, true);
+        return 200;
+    }
+
+
+    private Doc buildDoc(String batchID, JSONObject document) {
+        String id = document.getString("id");
+        String title = document.getString("webTitle");
+        String rawDate = document.getString("webPublicationDate");
+        String date = rawDate.substring(0, rawDate.indexOf("T"));
+        String body = document.getJSONObject("fields").getString("bodyText");
+
+        return new Doc(id, title, date, body, batchID);
     }
 
     private List<JSONObject> getRawDocs(int nDocs, String query, String fromDate, String toDate) throws Exception {

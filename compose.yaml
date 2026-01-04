@@ -60,6 +60,8 @@ services:
       - "8081:8080"
     depends_on:
       - mongo
+    env_file:
+      - .env
     environment:
       SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/app
     volumes:

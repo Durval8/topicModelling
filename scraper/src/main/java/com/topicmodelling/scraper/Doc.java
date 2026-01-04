@@ -17,7 +17,7 @@ public class Doc {
     private String title;
     private String date;        // ISO-8601 yyyy-MM-dd
     private String rawContent;
-    private String theme;
+    private String modelID;
 
 //    public Doc(String articleId, String title, String date, String rawContent, String theme) {
 //        this.articleId = articleId;
